@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -56,16 +57,18 @@ const QuestionPageSkeleton = () => (
 )
 
 
-export default function QuestionPage({ params }: { params: { id: string } }) {
+export default function QuestionPage() {
     const [question, setQuestion] = useState<Question | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const params = useParams();
+    const id = params.id as string;
 
     useEffect(() => {
         const fetchQuestion = async () => {
             if (!db) return;
             setIsLoading(true);
             try {
-                const docRef = doc(db, 'questions', params.id);
+                const docRef = doc(db, 'questions', id);
                 const docSnap = await getDoc(docRef);
 
                 if (docSnap.exists()) {
@@ -80,10 +83,10 @@ export default function QuestionPage({ params }: { params: { id: string } }) {
             }
         };
 
-        if (params.id) {
+        if (id) {
             fetchQuestion();
         }
-    }, [params.id]);
+    }, [id]);
 
     if (isLoading) {
         return <QuestionPageSkeleton />;
