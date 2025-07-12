@@ -16,6 +16,9 @@ export default {
       },
     },
     extend: {
+       minHeight: {
+        'screen-minus-header': 'calc(100vh - 4rem)', // Assuming header height is 4rem (h-16)
+      },
       fontFamily: {
         body: ['Inter', 'sans-serif'],
         headline: ['Inter', 'sans-serif'],
