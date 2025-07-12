@@ -16,6 +16,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { auth } from '@/lib/firebase';
 import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
+import { ThemeToggle } from './theme-toggle';
 
 export function Header() {
   const { user } = useAuth();
@@ -42,6 +43,7 @@ export function Header() {
           )}
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-2 sm:space-x-4">
+           <ThemeToggle />
           {user ? (
             <>
               <Button variant="ghost" size="icon" className="relative">
