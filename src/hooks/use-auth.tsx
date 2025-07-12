@@ -26,6 +26,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!auth || !db) {
+        setLoading(false);
+        return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const userDocRef = doc(db, "users", firebaseUser.uid);
@@ -55,6 +60,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
+  }
+  
+  if (!auth) {
+    return (
+        <div className="flex h-screen w-full items-center justify-center p-4">
+            <div className="text-center rounded-lg border-2 border-dashed border-destructive p-8">
+                <h2 className="text-xl font-semibold text-destructive">Firebase Configuration Error</h2>
+                <p className="text-muted-foreground mt-2">
+                    Firebase is not configured correctly. Please add your Firebase project credentials to the <code>.env</code> file.
+                </p>
+            </div>
+        </div>
+    )
   }
 
   return (
