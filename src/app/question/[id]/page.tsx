@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc, getDoc, collection, getDocs, orderBy, query, writeBatch, increment, serverTimestamp, updateDoc, addDoc, deleteDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -122,6 +122,7 @@ export default function QuestionPage() {
     const { toast } = useToast();
     const params = useParams();
     const router = useRouter();
+    const formRef = useRef<HTMLDivElement>(null);
     const id = params.id as string;
 
     const isQuestionAuthor = user && question && user.uid === question.authorId;
@@ -166,6 +167,7 @@ export default function QuestionPage() {
             const questionRef = doc(db, 'questions', id);
             updateDoc(questionRef, { views: increment(1) }).catch(e => console.warn("Could not increment view count", e));
             fetchQuestionAndAnswers();
+            
         }
     }, [id, fetchQuestionAndAnswers]);
 
@@ -186,12 +188,20 @@ export default function QuestionPage() {
                 // Creating new answer
                 const batch = writeBatch(db);
                 const answerRef = doc(collection(db, 'questions', question.id, 'answers'));
+
+                // Fetch user profile data for authorName and authorAvatar
+                const userDocRef = doc(db, 'users', user.uid);
+                const userDocSnap = await getDoc(userDocRef);
+                const userData = userDocSnap.exists() ? userDocSnap.data() : null;
+
+                const authorName = userData?.name || user.displayName || user.email;
+                const authorAvatar = userData?.image || user.photoURL || `https://placehold.co/40x40.png`;
                 
                 batch.set(answerRef, {
                     content,
                     authorId: user.uid,
-                    authorName: user.displayName || user.username,
-                    authorAvatar: user.photoURL || `https://placehold.co/40x40.png`,
+ authorName: authorName,
+ authorAvatar: authorAvatar,
                     votes: 0,
                     createdAt: serverTimestamp(),
                     isAccepted: false,
@@ -207,8 +217,8 @@ export default function QuestionPage() {
                     await addDoc(collection(db, 'notifications'), {
                         recipientId: question.authorId,
                         senderId: user.uid,
-                        senderName: user.displayName || user.username,
                         type: 'new_answer',
+                        answerId: answerRef.id, // Add answerId to notification
                         questionId: question.id,
                         questionTitle: question.title,
                         read: false,
@@ -257,8 +267,7 @@ export default function QuestionPage() {
 
     const handleEditAnswer = (answer: Answer) => {
         setEditingAnswerId(answer.id);
-        const formElement = document.getElementById('answer-form');
-        formElement?.scrollIntoView({ behavior: 'smooth' });
+        formRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
 
     if (isLoading && !question) {
@@ -371,7 +380,7 @@ export default function QuestionPage() {
                     
                     {/* Your Answer Section */}
                     <div id="answer-form">
-                        <AnswerForm 
+                        <AnswerForm
                             onSubmit={handleAnswerSubmit}
                             existingAnswer={editingAnswerId ? answers.find(a => a.id === editingAnswerId) : userAnswer}
                             key={editingAnswerId || userAnswer?.id}

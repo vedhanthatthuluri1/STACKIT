@@ -17,6 +17,7 @@ import type { DocumentData } from 'firebase/firestore';
 interface Question extends DocumentData {
   id: string;
   title: string;
+  authorId: string;
   authorName: string;
   authorAvatar: string;
   tags: string[];
@@ -116,6 +117,7 @@ export default function Home() {
         id={q.id}
         title={q.title}
         author={q.authorName}
+        authorId={q.authorId}
         authorAvatar={q.authorAvatar}
         tags={q.tags}
         votes={q.votes}
@@ -151,7 +153,7 @@ export default function Home() {
             </Link>
           </Button>
         </div>
-        <Tabs defaultValue="recent" className="w-full" onValueChange={setActiveTab}>
+        <Tabs defaultValue="recent" className="w-full" onValueChange={setActiveTab} value={activeTab}>
           <TabsList className="grid w-full grid-cols-3 sm:w-auto sm:inline-flex">
             <TabsTrigger value="recent">Recent</TabsTrigger>
             <TabsTrigger value="most-voted">Most Voted</TabsTrigger>
