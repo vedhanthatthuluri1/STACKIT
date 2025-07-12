@@ -15,7 +15,7 @@ service cloud.firestore {
     match /users/{userId} {
       allow create: if request.auth.uid == userId;
       allow get, list: if request.auth != null;
-      allow update: if isOwner(userId);
+      allow update: if request.auth != null && isOwner(userId);
     }
 
     // Questions Collection
@@ -25,23 +25,26 @@ service cloud.firestore {
     match /questions/{questionId} {
       allow get, list: if true;
       allow create: if request.auth != null && isOwner(request.resource.data.authorId);
-      allow update: if request.auth != null && isOwner(resource.data.authorId);
-      allow delete: if request.auth != null && isOwner(resource.data.authorId);
+      allow update, delete: if request.auth != null && isOwner(resource.data.authorId);
 
       // Answers Subcollection
-      // - Anyone can read answers.
+      // - Anyone can read/list answers.
       // - Authenticated users can create answers.
       // - Question author can accept an answer.
-      // - Answer author can update their answer.
-      // - Answer author OR question author can delete an answer.
+      // - Answer author can update/delete their answer.
       match /answers/{answerId} {
-        allow get: if true;
+        allow get, list: if true;
         allow create: if request.auth != null && isOwner(request.resource.data.authorId);
         allow update: if request.auth != null && 
                       (isOwner(resource.data.authorId) || isOwner(get(/databases/$(database)/documents/questions/$(questionId)).data.authorId));
         allow delete: if request.auth != null && 
                       (isOwner(resource.data.authorId) || isOwner(get(/databases/$(database)/documents/questions/$(questionId)).data.authorId));
       }
+    }
+    
+    // Answers Collection Group (for profile page queries)
+    match /{path=**}/answers/{answerId} {
+      allow list: if request.auth != null;
     }
 
     // Votes Subcollection (under users)
