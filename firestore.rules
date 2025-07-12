@@ -3,40 +3,58 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper Functions
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
+    // Users Collection
+    // - Anyone can create their own user document on sign up.
+    // - Anyone authenticated can view profiles.
+    // - Users can only update their own profile.
     match /users/{userId} {
-      allow get, list: if request.auth != null;
       allow create: if request.auth.uid == userId;
+      allow get, list: if request.auth != null;
       allow update: if isOwner(userId);
     }
 
+    // Questions Collection
+    // - Anyone can read questions.
+    // - Authenticated users can create questions.
+    // - Only the author can update or delete their question.
     match /questions/{questionId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if request.auth.uid != null;
-      allow update: if request.auth.uid != null && isOwner(resource.data.authorId);
-      allow delete: if request.auth.uid != null && isOwner(resource.data.authorId);
+      allow get, list: if true;
+      allow create: if request.auth != null && isOwner(request.resource.data.authorId);
+      allow update, delete: if request.auth != null && isOwner(resource.data.authorId);
+
+      // Answers Subcollection
+      // - Anyone can read answers.
+      // - Authenticated users can create answers.
+      // - Question author can accept an answer.
+      // - Answer author can update their answer.
+      // - Answer author OR question author can delete an answer.
+      match /answers/{answerId} {
+        allow get: if true;
+        allow create: if request.auth != null && isOwner(request.resource.data.authorId);
+        allow update: if request.auth != null && 
+                      (isOwner(resource.data.authorId) || isOwner(get(/databases/$(database)/documents/questions/$(questionId)).data.authorId));
+        allow delete: if request.auth != null && 
+                      (isOwner(resource.data.authorId) || isOwner(get(/databases/$(database)/documents/questions/$(questionId)).data.authorId));
+      }
     }
 
-    match /questions/{questionId}/answers/{answerId} {
-      allow read, list: if true;
-      allow create: if request.auth.uid != null;
-      // Allow update by answer author (for editing) or question author (for accepting)
-      allow update: if request.auth.uid != null && (isOwner(resource.data.authorId) || isOwner(get(/databases/$(database)/documents/questions/$(questionId)).data.authorId));
-      // Allow delete by answer author OR if the parent question is being deleted.
-      allow delete: if request.auth.uid != null && (isOwner(resource.data.authorId) || !exists(/databases/$(database)/documents/questions/$(questionId)));
-    }
-
+    // Votes Subcollection (under users)
+    // - A user can only manage their own votes.
     match /users/{userId}/votes/{voteId} {
-      allow read, create, delete: if isOwner(userId);
+        allow read, write, delete: if isOwner(userId);
     }
     
+    // Notifications Collection
+    // - Only the recipient can read their notifications.
+    // - Authenticated users can create notifications (by answering questions).
     match /notifications/{notificationId} {
-      allow read, update, delete: if isOwner(resource.data.recipientId);
-      allow create: if request.auth.uid != null;
+        allow read, update: if request.auth.uid == resource.data.recipientId;
+        allow create: if request.auth != null;
     }
   }
 }
