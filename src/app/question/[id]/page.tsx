@@ -208,10 +208,10 @@ export default function QuestionPage() {
                         <CardContent className="pt-6">
                              <div className="flex gap-6">
                                 <VoteButtons type="question" id={question.id} initialVotes={question.votes} />
-                                <div className="prose dark:prose-invert max-w-none prose-p:text-foreground/90 prose-pre:bg-muted prose-pre:p-4 prose-pre:rounded-md prose-pre:overflow-x-auto w-full">
+                                <div className="prose dark:prose-invert max-w-none prose-p:text-foreground/90 w-full">
                                     <p>{question.description}</p>
                                     {question.code && (
-                                        <pre>
+                                        <pre className="bg-muted p-4 rounded-md overflow-x-auto">
                                             <code className="font-code">{question.code}</code>
                                         </pre>
                                     )}
@@ -220,7 +220,7 @@ export default function QuestionPage() {
 
                             <div className="flex flex-wrap gap-2 mt-6 ml-16">
                                 {question.tags.map(tag => (
-                                    <Badge key={tag} variant="secondary">{tag}</Badge>
+                                    <Badge key={tag} variant="secondary" className="bg-accent/20 text-accent-foreground border-accent/30 hover:bg-accent/30">{tag}</Badge>
                                 ))}
                             </div>
                         </CardContent>
