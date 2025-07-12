@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Send } from 'lucide-react';
+import { Loader2, Send, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 const questionFormSchema = z.object({
@@ -111,6 +111,10 @@ export default function AskQuestionPage() {
 
   return (
     <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <Button variant="ghost" onClick={() => router.back()} className="mb-4">
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Back
+      </Button>
       <Card>
         <CardHeader>
           <CardTitle className="text-3xl font-bold font-headline">Ask a Public Question</CardTitle>

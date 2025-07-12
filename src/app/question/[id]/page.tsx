@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { doc, getDoc, collection, getDocs, orderBy, query, writeBatch, increment, serverTimestamp, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
@@ -17,6 +17,8 @@ import { AnswerForm } from '@/components/answer-form';
 import { VoteButtons } from '@/components/vote-buttons';
 import type { DocumentData, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
 
 interface Question extends DocumentData {
   id: string;
@@ -98,25 +100,26 @@ export default function QuestionPage() {
     const { user } = useAuth();
     const { toast } = useToast();
     const params = useParams();
+    const router = useRouter();
     const id = params.id as string;
 
     const fetchQuestionAndAnswers = useCallback(async (isInitialLoad = false) => {
         if (!db || !id) return;
         
-        // Only show loader on the very first load
+        const questionRef = doc(db, 'questions', id);
+
         if (isInitialLoad) {
             setIsLoading(true);
+            try {
+                // We use a separate update call here that doesn't depend on the rest of the function
+                await updateDoc(questionRef, { views: increment(1) });
+            } catch (e) {
+                // Non-critical, so we can ignore if it fails (e.g., permissions)
+                console.warn("Could not increment view count", e);
+            }
         }
         
         try {
-            const questionRef = doc(db, 'questions', id);
-            
-            // Only increment view on initial load
-            if (isInitialLoad) {
-                // We use a separate update call here that doesn't depend on the rest of the function
-                await updateDoc(questionRef, { views: increment(1) });
-            }
-
             const questionSnap = await getDoc(questionRef);
 
             if (questionSnap.exists()) {
@@ -221,6 +224,10 @@ export default function QuestionPage() {
 
     return (
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <Button variant="ghost" onClick={() => router.back()} className="mb-4">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to questions
+            </Button>
             <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
                 <div className="md:col-span-9 space-y-8">
                     {/* Question Card */}
