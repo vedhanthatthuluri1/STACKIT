@@ -23,6 +23,7 @@ export default function RegisterPage() {
   const { toast } = useToast();
 
   const isUsernameUnique = async (username: string) => {
+    if (!db) return false;
     const q = query(collection(db, "users"), where("username", "==", username));
     const querySnapshot = await getDocs(q);
     return querySnapshot.empty;
@@ -31,6 +32,16 @@ export default function RegisterPage() {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+
+    if (!auth || !db) {
+        toast({
+            variant: 'destructive',
+            title: 'Registration Failed',
+            description: 'Firebase is not configured correctly. Please check your credentials.',
+        });
+        setIsLoading(false);
+        return;
+    }
 
     if (password.length < 6) {
         toast({ variant: 'destructive', title: 'Registration Failed', description: 'Password must be at least 6 characters long.' });
