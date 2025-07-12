@@ -3,47 +3,40 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper functions
     function isOwner(userId) {
-      return request.auth.uid == userId;
+      return request.auth != null && request.auth.uid == userId;
     }
 
-    // Questions collection
-    match /questions/{questionId} {
-      allow read: if true;
-      allow create: if request.auth != null;
-      allow update: if isOwner(resource.data.authorId);
-
-      // Answers subcollection
-      match /answers/{answerId} {
-        allow read: if true;
-        allow create: if request.auth != null;
-        allow update: if isOwner(resource.data.authorId);
-        // Allow question owner or answer owner to delete
-        allow delete: if isOwner(resource.data.authorId) || isOwner(get(/databases/$(database)/documents/questions/$(questionId)).data.authorId);
-      }
-    }
-
-    // Users collection
     match /users/{userId} {
-      allow read: if request.auth != null;
-      // Allow document creation if the document's uid field matches the user's id.
-      // This is for user registration.
-      allow create: if request.resource.data.uid == userId;
+      allow read: if true;
+      allow create: if request.auth.uid == userId;
       allow update: if isOwner(userId);
     }
     
-    // Votes subcollection within users
-    match /users/{userId}/votes/{voteId} {
-        allow read, write: if isOwner(userId);
+    match /questions/{questionId} {
+      allow read: if true;
+      allow list: if true;
+      allow create: if isOwner(request.resource.data.authorId);
+      allow update: if isOwner(resource.data.authorId);
+      allow delete: if isOwner(resource.data.authorId);
+      
+      match /answers/{answerId} {
+        allow read: if true;
+        allow create: if isOwner(request.resource.data.authorId);
+        allow update: if isOwner(resource.data.authorId);
+        allow delete: if 
+          isOwner(resource.data.authorId) || 
+          isOwner(get(/databases/$(database)/documents/questions/$(questionId)).data.authorId);
+      }
     }
 
-    // Notifications collection
     match /notifications/{notificationId} {
-      allow get: if isOwner(resource.data.recipientId);
-      allow list: if request.auth != null && request.query.where.recipientId == request.auth.uid;
-      allow create: if request.auth != null;
-      allow update: if isOwner(resource.data.recipientId); // For marking as read
+       allow read, write: if isOwner(resource.data.recipientId);
+    }
+
+    // This collection stores user votes to prevent duplicate voting
+    match /users/{userId}/votes/{contentId} {
+      allow read, write: if isOwner(userId);
     }
   }
 }
