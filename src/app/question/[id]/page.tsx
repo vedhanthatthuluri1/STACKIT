@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, getDoc, collection, getDocs, orderBy, query, writeBatch, increment, serverTimestamp, updateDoc, addDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, orderBy, query, writeBatch, increment, serverTimestamp, updateDoc, addDoc, deleteDoc, where } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -18,7 +18,25 @@ import { VoteButtons } from '@/components/vote-buttons';
 import type { DocumentData, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, MoreVertical } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+
 
 interface Question extends DocumentData {
   id: string;
@@ -98,12 +116,15 @@ export default function QuestionPage() {
     const [question, setQuestion] = useState<Question | null>(null);
     const [answers, setAnswers] = useState<Answer[]>([]);
     const [userAnswer, setUserAnswer] = useState<Answer | null>(null);
+    const [editingAnswerId, setEditingAnswerId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const { user } = useAuth();
     const { toast } = useToast();
     const params = useParams();
     const router = useRouter();
     const id = params.id as string;
+
+    const isQuestionAuthor = user && question && user.uid === question.authorId;
 
     const fetchQuestionAndAnswers = useCallback(async () => {
         if (!db || !id) return;
@@ -117,7 +138,7 @@ export default function QuestionPage() {
                 setQuestion(questionData);
 
                 // Fetch answers
-                const answersQuery = query(collection(db, 'questions', id, 'answers'), orderBy('createdAt', 'desc'));
+                const answersQuery = query(collection(db, 'questions', id, 'answers'), orderBy('isAccepted', 'desc'), orderBy('votes', 'desc'), orderBy('createdAt', 'desc'));
                 const answersSnap = await getDocs(answersQuery);
                 const answersData = answersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Answer));
                 
@@ -155,11 +176,12 @@ export default function QuestionPage() {
         }
 
         try {
-            if (userAnswer) {
+            if (editingAnswerId) {
                 // Editing existing answer
-                const answerRef = doc(db, 'questions', question.id, 'answers', userAnswer.id);
+                const answerRef = doc(db, 'questions', question.id, 'answers', editingAnswerId);
                 await updateDoc(answerRef, { content });
                 toast({ title: 'Success!', description: 'Your answer has been updated.' });
+                setEditingAnswerId(null);
             } else {
                 // Creating new answer
                 const batch = writeBatch(db);
@@ -203,7 +225,41 @@ export default function QuestionPage() {
             toast({ variant: 'destructive', title: 'Error', description: `Failed to submit answer: ${error.message}` });
         }
     };
+    
+    const handleDeleteQuestion = async () => {
+        if (!isQuestionAuthor) return;
 
+        try {
+            const batch = writeBatch(db);
+            const questionRef = doc(db, 'questions', id);
+            batch.delete(questionRef);
+
+            const answersRef = collection(db, 'questions', id, 'answers');
+            const answersSnapshot = await getDocs(answersRef);
+            answersSnapshot.forEach(doc => batch.delete(doc.ref));
+
+            const notificationsQuery = query(collection(db, 'notifications'), where('questionId', '==', id));
+            const notificationsSnapshot = await getDocs(notificationsQuery);
+            notificationsSnapshot.forEach(doc => batch.delete(doc.ref));
+
+            await batch.commit();
+
+            toast({ title: "Question Deleted", description: "The question has been removed." });
+            router.push('/');
+        } catch (error: any) {
+            toast({
+                variant: "destructive",
+                title: "Error Deleting Question",
+                description: error.message,
+            });
+        }
+    };
+
+    const handleEditAnswer = (answer: Answer) => {
+        setEditingAnswerId(answer.id);
+        const formElement = document.getElementById('answer-form');
+        formElement?.scrollIntoView({ behavior: 'smooth' });
+    }
 
     if (isLoading && !question) {
         return <QuestionPageSkeleton />;
@@ -225,9 +281,48 @@ export default function QuestionPage() {
                 <div className="md:col-span-9 space-y-8">
                     {/* Question Card */}
                     <Card>
-                        <CardHeader>
-                            <h1 className="text-3xl font-bold font-headline">{question.title}</h1>
-                            <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
+                        <CardHeader className="relative">
+                            <h1 className="text-3xl font-bold font-headline pr-10">{question.title}</h1>
+                             {isQuestionAuthor && (
+                                <div className="absolute top-4 right-4">
+                                    <AlertDialog>
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                                    <MoreVertical className="h-4 w-4" />
+                                                </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end">
+                                                <DropdownMenuItem onSelect={() => router.push(`/question/edit/${id}`)}>
+                                                    <Edit className="mr-2 h-4 w-4" />
+                                                    <span>Edit</span>
+                                                </DropdownMenuItem>
+                                                <AlertDialogTrigger asChild>
+                                                    <DropdownMenuItem className="text-destructive" onSelect={(e) => e.preventDefault()}>
+                                                        <Trash2 className="mr-2 h-4 w-4" />
+                                                        <span>Delete</span>
+                                                    </DropdownMenuItem>
+                                                </AlertDialogTrigger>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    This action cannot be undone. This will permanently delete your question.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                <AlertDialogAction onClick={handleDeleteQuestion} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                                                    Delete
+                                                </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-4 pt-4 text-sm text-muted-foreground">
                                 <Avatar className="h-10 w-10">
                                     <AvatarImage src={question.authorAvatar} data-ai-hint="avatar" />
                                     <AvatarFallback>{question.authorName?.charAt(0)}</AvatarFallback>
@@ -264,16 +359,24 @@ export default function QuestionPage() {
                     <div className="space-y-6">
                         <h2 className="text-2xl font-bold font-headline">{answers.length} {answers.length === 1 ? 'Answer' : 'Answers'}</h2>
                         {answers.map(answer => (
-                           <AnswerCard key={answer.id} questionId={question.id} answer={answer} />
+                           <AnswerCard 
+                                key={answer.id} 
+                                questionId={question.id}
+                                questionAuthorId={question.authorId}
+                                answer={answer} 
+                                onEdit={() => handleEditAnswer(answer)}
+                            />
                         ))}
                     </div>
                     
                     {/* Your Answer Section */}
-                    <AnswerForm 
-                        onSubmit={handleAnswerSubmit}
-                        existingAnswer={userAnswer}
-                    />
-
+                    <div id="answer-form">
+                        <AnswerForm 
+                            onSubmit={handleAnswerSubmit}
+                            existingAnswer={editingAnswerId ? answers.find(a => a.id === editingAnswerId) : userAnswer}
+                            key={editingAnswerId || userAnswer?.id}
+                        />
+                    </div>
                 </div>
                 {/* Right Sidebar */}
                 <div className="md:col-span-3">
@@ -300,4 +403,3 @@ export default function QuestionPage() {
         </div>
     );
 }
-

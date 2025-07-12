@@ -27,6 +27,7 @@ interface UserProfile extends DocumentData {
 interface Question extends DocumentData {
   id: string;
   title: string;
+  authorId: string;
   authorName: string;
   authorAvatar: string;
   tags: string[];
@@ -181,7 +182,20 @@ export default function ProfilePage() {
                         <TabsContent value="questions" className="mt-6">
                             <div className="space-y-4">
                                 {questions.length > 0 ? (
-                                    questions.map(q => <QuestionCard key={q.id} {...q} />)
+                                    questions.map(q => <QuestionCard 
+                                      key={q.id}
+                                      id={q.id}
+                                      title={q.title}
+                                      author={q.authorName}
+                                      authorId={q.authorId}
+                                      authorAvatar={q.authorAvatar}
+                                      tags={q.tags}
+                                      votes={q.votes}
+                                      answersCount={q.answersCount}
+                                      views={q.views}
+                                      contentSnippet={q.description}
+                                      createdAt={q.createdAt}
+                                    />)
                                 ) : (
                                     <p className="text-muted-foreground text-center py-10">This user hasn't asked any questions yet.</p>
                                 )}
