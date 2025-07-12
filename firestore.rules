@@ -1,55 +1,53 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users collection
-    // Anyone can read user profiles.
-    // Users can only create and update their own profiles.
+    // Users: Publicly readable for profiles, but only the user can write to their own doc.
     match /users/{userId} {
       allow read;
-      allow create, update: if request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
-
-    // Votes subcollection for users
-    // Users can only manage their own votes.
+    
+    // User Votes: Only the user can access their own votes subcollection.
     match /users/{userId}/votes/{voteId} {
-        allow read, write: if request.auth.uid == userId;
+        allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Questions collection
-    // Logged-in users can create questions.
-    // Anyone can read questions.
-    // Users can only update their own questions for specific fields.
-    // Users can update the answersCount on any question when adding an answer.
+    // Questions: Allow reads for everyone.
+    // Writes (create, update, delete) are restricted.
     match /questions/{questionId} {
       allow read;
-      allow create: if request.auth.uid != null;
-      
-      // Allow users to update only the votes and views count on any question
-      allow update: if request.auth.uid != null &&
+      // Allow create if user is logged in
+      allow create: if request.auth != null;
+      // Allow updates for specific fields like votes and answersCount if logged in
+      allow update: if request.auth != null && 
                       (
-                        // Rule for updating votes/views
                         (request.resource.data.diff(resource.data).affectedKeys()
                           .hasOnly(['votes', 'views'])) ||
-                        // Rule for updating answersCount
-                        (request.resource.data.diff(resource.data).affectedKeys()
-                          .hasOnly(['answersCount']) && 
-                         request.resource.data.answersCount == resource.data.answersCount + 1)
+                        (request.resource.data.answersCount == resource.data.answersCount + 1)
                       );
+      allow delete: if request.auth != null && request.auth.uid == resource.data.authorId;
 
-      // Answers subcollection
+      // Answers Subcollection
       match /answers/{answerId} {
         allow read;
-        // Logged-in users can create answers.
-        allow create: if request.auth.uid != null;
-        // Allow users to update their own answers.
-        allow update: if request.auth.uid == resource.data.authorId;
-        // Allow users to update votes on any answer
-        allow update: if request.auth.uid != null &&
-                        request.resource.data.diff(resource.data).affectedKeys()
-                          .hasOnly(['votes']);
+        // Allow user to create an answer
+        allow create: if request.auth != null;
+        // Allow author to update their answer
+        allow update: if request.auth != null && request.auth.uid == resource.data.authorId;
+        // Allow author to delete their answer
+        allow delete: if request.auth != null && request.auth.uid == resource.data.authorId;
       }
+    }
+    
+    // Notifications: Users can only read their own notifications.
+    // Creation is handled by backend logic (triggered by answering a question).
+    match /notifications/{notificationId} {
+      allow read, update: if request.auth != null && request.auth.uid == resource.data.recipientId;
+      allow create: if request.auth != null; // Server-side creation is authenticated
+      allow delete: if request.auth != null && request.auth.uid == resource.data.recipientId;
     }
   }
 }

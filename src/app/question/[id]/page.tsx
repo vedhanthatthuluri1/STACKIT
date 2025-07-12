@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { doc, getDoc, collection, getDocs, orderBy, query, writeBatch, increment, serverTimestamp, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, orderBy, query, writeBatch, increment, serverTimestamp, updateDoc, addDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -102,6 +102,8 @@ export default function QuestionPage() {
 
     const fetchQuestionAndAnswers = useCallback(async (isInitialLoad = false) => {
         if (!db || !id) return;
+        
+        // Only show loader on the very first load
         if (isInitialLoad) {
             setIsLoading(true);
         }
@@ -109,10 +111,10 @@ export default function QuestionPage() {
         try {
             const questionRef = doc(db, 'questions', id);
             
+            // Only increment view on initial load
             if (isInitialLoad) {
-                const batch = writeBatch(db);
-                batch.update(questionRef, { views: increment(1) });
-                await batch.commit();
+                // We use a separate update call here that doesn't depend on the rest of the function
+                await updateDoc(questionRef, { views: increment(1) });
             }
 
             const questionSnap = await getDoc(questionRef);
@@ -181,6 +183,20 @@ export default function QuestionPage() {
                 batch.update(questionRef, { answersCount: increment(1) });
 
                 await batch.commit();
+
+                // Send notification only if someone else answers the question
+                if (user.uid !== question.authorId) {
+                    await addDoc(collection(db, 'notifications'), {
+                        recipientId: question.authorId,
+                        senderId: user.uid,
+                        senderName: user.displayName || user.username,
+                        type: 'new_answer',
+                        questionId: question.id,
+                        questionTitle: question.title,
+                        read: false,
+                        createdAt: serverTimestamp(),
+                    });
+                }
                  toast({ title: 'Success!', description: 'Your answer has been posted.' });
             }
             
