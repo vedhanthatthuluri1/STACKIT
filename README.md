@@ -3,6 +3,16 @@
 
 StackIt is a full-featured Q&A platform built with a modern, futuristic aesthetic. It allows users to ask questions, provide answers, vote on content, and build a community around solving technical problems. The project leverages Next.js for the frontend and Firebase for the backend services, including authentication, database, and storage.
 
+## 👥 Team Members
+
+@VedhanthA      Team Leader |
+@Yogyatha-09      Developer |
+@manoj-2305         Backend |
+@sharanreddy12      Backend |
+
+---
+
+
 ## Core Features
 
 -   **User Authentication**: Secure user sign-up and login using Firebase Authentication (Email/Password).
