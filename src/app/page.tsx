@@ -3,6 +3,7 @@ import { QuestionCard } from '@/components/question-card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PlusCircle } from 'lucide-react';
+import Link from 'next/link';
 
 const questions = [
   {
@@ -58,9 +59,11 @@ export default function Home() {
       <div className="mt-16">
         <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
           <h2 className="text-3xl font-bold font-headline tracking-tight">Community Questions</h2>
-          <Button>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Ask Question
+          <Button asChild>
+            <Link href="/ask-question">
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Ask Question
+            </Link>
           </Button>
         </div>
         <Tabs defaultValue="recent" className="w-full">
