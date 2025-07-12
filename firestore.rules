@@ -3,39 +3,57 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users: Allow public read, but only authenticated users can create their own profile.
-    // Only the user can update their own profile.
-    match /users/{userId} {
-      allow read: if true;
-      allow create: if request.auth.uid == userId;
-      allow update: if request.auth.uid == userId;
-      
-      // Votes subcollection
-      match /votes/{voteId} {
-        allow read, write: if request.auth.uid == userId;
-      }
-    }
-
-    // Questions: Allow public read. Authenticated users can create.
-    // Only authors can update or delete.
     match /questions/{questionId} {
+      // Anyone can read questions.
       allow read: if true;
+      
+      // Only authenticated users can create questions.
       allow create: if request.auth.uid != null;
+      
+      // Only the author can update or delete their question.
       allow update, delete: if request.auth.uid == resource.data.authorId;
 
-      // Answers subcollection
       match /answers/{answerId} {
+        // Anyone can read answers.
         allow read: if true;
+
+        // Only authenticated users can create answers.
         allow create: if request.auth.uid != null;
-        allow update, delete: if request.auth.uid == resource.data.authorId;
+
+        // Only the author of the answer can update it.
+        // The author of the question can also update to accept it.
+        allow update: if request.auth.uid == resource.data.authorId || request.auth.uid == get(/databases/$(database)/documents/questions/$(questionId)).data.authorId;
+        
+        // Only the author of the answer can delete it.
+        allow delete: if request.auth.uid == resource.data.authorId;
       }
     }
-    
-    // Notifications: Users can only interact with their own notifications.
+
+    match /users/{userId} {
+      // Any authenticated user can view user profiles.
+      allow get, list: if request.auth.uid != null;
+
+      // Users can only write to their own document.
+      allow write: if request.auth.uid == userId;
+
+      match /votes/{voteId} {
+        // Users can only manage their own votes.
+        allow read, write, delete: if request.auth.uid == userId;
+      }
+    }
+
     match /notifications/{notificationId} {
-        allow get, list: if request.auth.uid == resource.data.recipientId;
-        allow create: if request.auth.uid != null;
-        allow update: if request.auth.uid == resource.data.recipientId && request.resource.data.read == true;
+      // Users can only get their own notifications.
+      allow get: if request.auth.uid == resource.data.recipientId;
+      
+      // Users can only query for their own notifications.
+      allow list: if request.auth.uid == request.query.get("where").recipientId;
+      
+      // Notifications can be created by any authenticated user.
+      allow create: if request.auth.uid != null;
+      
+      // Users can only update their own notifications (e.g., to mark as read).
+      allow update: if request.auth.uid == resource.data.recipientId;
     }
   }
 }
