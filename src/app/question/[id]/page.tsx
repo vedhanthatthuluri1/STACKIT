@@ -208,13 +208,15 @@ export default function QuestionPage() {
                         <CardContent className="pt-6">
                              <div className="flex gap-6">
                                 <VoteButtons type="question" id={question.id} initialVotes={question.votes} />
-                                <div className="prose dark:prose-invert max-w-none prose-p:text-foreground/90 w-full">
-                                    <p>{question.description}</p>
-                                    {question.code && (
-                                        <pre className="bg-muted p-4 rounded-md overflow-x-auto">
-                                            <code className="font-code">{question.code}</code>
-                                        </pre>
-                                    )}
+                                <div className="min-w-0 flex-1">
+                                    <div className="prose dark:prose-invert max-w-none prose-p:text-foreground/90 w-full">
+                                        <p>{question.description}</p>
+                                        {question.code && (
+                                            <pre className="bg-muted p-4 rounded-md overflow-x-auto">
+                                                <code className="font-code">{question.code}</code>
+                                            </pre>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
