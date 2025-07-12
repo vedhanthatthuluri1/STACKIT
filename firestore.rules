@@ -3,42 +3,58 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helper Functions
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
+    // This function checks if the current user is the author of the parent question.
+    // It's used to allow the question author to delete answers and notifications when they delete their question.
     function isQuestionAuthor(questionId) {
       return request.auth.uid == get(/databases/$(database)/documents/questions/$(questionId)).data.authorId;
     }
 
+    // Users Collection
     match /users/{userId} {
       allow create: if request.auth.uid == userId;
       allow get, list: if request.auth != null;
-      allow update: if request.auth != null && isOwner(userId);
+      allow update: if isOwner(userId);
     }
 
+    // Questions Collection
     match /questions/{questionId} {
-      allow read: if true;
+      allow get, list: if true;
       allow create: if request.auth != null && isOwner(request.resource.data.authorId);
       allow update: if request.auth != null && isOwner(resource.data.authorId);
       allow delete: if request.auth != null && isOwner(resource.data.authorId);
 
+      // Answers Subcollection
       match /answers/{answerId} {
-        allow read: if true;
+        allow get, list: if true;
         allow create: if request.auth != null && isOwner(request.resource.data.authorId);
-        allow update: if request.auth != null && (isOwner(resource.data.authorId) || isQuestionAuthor(questionId));
+        // An answer can be updated by its own author
+        allow update: if request.auth != null && isOwner(resource.data.authorId);
+        // An answer can be deleted by its author OR by the author of the parent question.
         allow delete: if request.auth != null && (isOwner(resource.data.authorId) || isQuestionAuthor(questionId));
       }
     }
+    
+    // Collection group query for answers, used on profile pages.
+    match /{path=**}/answers/{answerId} {
+      allow list: if request.auth != null;
+    }
 
+    // Votes Subcollection (under users)
     match /users/{userId}/votes/{voteId} {
         allow read, write, delete: if isOwner(userId);
     }
-
+    
+    // Notifications Collection
     match /notifications/{notificationId} {
         allow read, update: if request.auth.uid == resource.data.recipientId;
         allow create: if request.auth != null;
-        allow delete: if request.auth.uid == resource.data.recipientId || isQuestionAuthor(resource.data.questionId);
+        // A notification can be deleted by its recipient OR the author of the question it relates to.
+        allow delete: if request.auth != null && (isOwner(resource.data.recipientId) || isQuestionAuthor(resource.data.questionId));
     }
   }
 }
