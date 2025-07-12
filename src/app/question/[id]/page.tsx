@@ -140,9 +140,18 @@ export default function QuestionPage() {
                 const questionData = { id: questionSnap.id, ...questionSnap.data() } as Question;
                 setQuestion(questionData);
 
-                const answersQuery = query(collection(db, 'questions', id, 'answers'), orderBy('isAccepted', 'desc'), orderBy('votes', 'desc'), orderBy('createdAt', 'desc'));
+                // Firestore doesn't support complex queries with inequalities on multiple fields without a composite index.
+                // We fetch sorted by votes and then re-sort in the client to put accepted answers first.
+                const answersQuery = query(collection(db, 'questions', id, 'answers'), orderBy('votes', 'desc'));
                 const answersSnap = await getDocs(answersQuery);
-                const answersData = answersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Answer));
+                let answersData = answersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Answer));
+                
+                // Sort client-side to bring accepted answer to the top
+                answersData.sort((a, b) => {
+                    if (a.isAccepted) return -1;
+                    if (b.isAccepted) return 1;
+                    return 0; // The rest are already sorted by votes
+                });
                 
                 const currentUserAnswer = answersData.find(answer => answer.authorId === user?.uid) || null;
                 setUserAnswer(currentUserAnswer);
