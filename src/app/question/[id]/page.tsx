@@ -135,8 +135,10 @@ export default function QuestionPage() {
     }, [id, toast]);
 
     useEffect(() => {
-        fetchQuestionAndAnswers();
-    }, [fetchQuestionAndAnswers]);
+        if (id) {
+            fetchQuestionAndAnswers();
+        }
+    }, [id, fetchQuestionAndAnswers]);
 
     const handleAnswerSubmit = async (content: string) => {
         if (!user || !question) {

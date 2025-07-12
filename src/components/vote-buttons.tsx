@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/use-auth';
 import { db } from '@/lib/firebase';
 import { doc, writeBatch, increment, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
@@ -104,8 +104,3 @@ export function VoteButtons({ type, id, questionId, initialVotes }: VoteButtonsP
         </div>
     );
 }
-
-// A simple useEffect was needed in this component. I'm adding it here to avoid a separate change.
-import { useEffect } from 'react';
-
-    
