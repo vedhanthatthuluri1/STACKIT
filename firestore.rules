@@ -3,42 +3,53 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users:
-    // - Anyone can read user profiles.
-    // - Users can only create their own profile.
-    // - Users can only update their own profile.
+    // Users collection
+    // Anyone can read user profiles.
+    // Users can only create and update their own profiles.
     match /users/{userId} {
-      allow read: if true;
-      allow create: if request.auth.uid == userId;
-      allow update: if request.auth.uid == userId;
+      allow read;
+      allow create, update: if request.auth.uid == userId;
     }
 
-    // Questions:
-    // - Anyone can read questions.
-    // - Authenticated users can create questions.
-    // - Users can only update their own questions (title, description, code, tags).
-    // - Users can update votes and answersCount on any question.
-    match /questions/{questionId} {
-      allow read: if true;
-      allow create: if request.auth != null;
-      allow update: if (request.auth.uid == resource.data.authorId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'description', 'code', 'tags']))
-                    || (request.auth != null && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes', 'answersCount', 'views']));
-      
-      // Answers:
-      // - Anyone can read answers.
-      // - Authenticated users can create answers.
-      // - Users can only update their own answers.
-      match /answers/{answerId} {
-        allow read: if true;
-        allow create: if request.auth != null;
-        allow update: if request.auth.uid == resource.data.authorId;
-      }
-    }
-    
-    // Votes:
-    // - Users can only create/delete their own votes.
+    // Votes subcollection for users
+    // Users can only manage their own votes.
     match /users/{userId}/votes/{voteId} {
-      allow write: if request.auth.uid == userId;
+        allow read, write: if request.auth.uid == userId;
+    }
+
+    // Questions collection
+    // Logged-in users can create questions.
+    // Anyone can read questions.
+    // Users can only update their own questions for specific fields.
+    // Users can update the answersCount on any question when adding an answer.
+    match /questions/{questionId} {
+      allow read;
+      allow create: if request.auth.uid != null;
+      
+      // Allow users to update only the votes and views count on any question
+      allow update: if request.auth.uid != null &&
+                      (
+                        // Rule for updating votes/views
+                        (request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['votes', 'views'])) ||
+                        // Rule for updating answersCount
+                        (request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['answersCount']) && 
+                         request.resource.data.answersCount == resource.data.answersCount + 1)
+                      );
+
+      // Answers subcollection
+      match /answers/{answerId} {
+        allow read;
+        // Logged-in users can create answers.
+        allow create: if request.auth.uid != null;
+        // Allow users to update their own answers.
+        allow update: if request.auth.uid == resource.data.authorId;
+        // Allow users to update votes on any answer
+        allow update: if request.auth.uid != null &&
+                        request.resource.data.diff(resource.data).affectedKeys()
+                          .hasOnly(['votes']);
+      }
     }
   }
 }
