@@ -3,7 +3,11 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, getDoc, collection, getDocs, orderBy, query, writeBatch, increment, serverTimestamp, updateDoc, addDoc, deleteDoc, where } from 'firebase/firestore';
+import {
+    doc, getDoc, collection, getDocs, orderBy, query, writeBatch,
+    increment, serverTimestamp, updateDoc, addDoc, deleteDoc, where,
+    type DocumentData, type Timestamp
+} from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -15,7 +19,6 @@ import { Separator } from '@/components/ui/separator';
 import { AnswerCard } from '@/components/answer-card';
 import { AnswerForm } from '@/components/answer-form';
 import { VoteButtons } from '@/components/vote-buttons';
-import type { DocumentData, Timestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Edit, Trash2, MoreVertical } from 'lucide-react';
@@ -122,7 +125,6 @@ export default function QuestionPage() {
     const { toast } = useToast();
     const params = useParams();
     const router = useRouter();
-    const formRef = useRef<HTMLDivElement>(null);
     const id = params.id as string;
 
     const isQuestionAuthor = user && question && user.uid === question.authorId;
@@ -138,7 +140,6 @@ export default function QuestionPage() {
                 const questionData = { id: questionSnap.id, ...questionSnap.data() } as Question;
                 setQuestion(questionData);
 
-                // Fetch answers
                 const answersQuery = query(collection(db, 'questions', id, 'answers'), orderBy('isAccepted', 'desc'), orderBy('votes', 'desc'), orderBy('createdAt', 'desc'));
                 const answersSnap = await getDocs(answersQuery);
                 const answersData = answersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Answer));
@@ -156,10 +157,7 @@ export default function QuestionPage() {
         } finally {
             setIsLoading(false);
         }
-    // We are disabling the exhaustive-deps rule here because we *only* want this to run when id changes.
-    // Re-running on user change would cause an infinite loop of re-renders.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id, toast]);
+    }, [id, user?.uid, toast]);
 
     useEffect(() => {
         if (id) {
@@ -167,7 +165,6 @@ export default function QuestionPage() {
             const questionRef = doc(db, 'questions', id);
             updateDoc(questionRef, { views: increment(1) }).catch(e => console.warn("Could not increment view count", e));
             fetchQuestionAndAnswers();
-            
         }
     }, [id, fetchQuestionAndAnswers]);
 
@@ -179,29 +176,26 @@ export default function QuestionPage() {
 
         try {
             if (editingAnswerId) {
-                // Editing existing answer
                 const answerRef = doc(db, 'questions', question.id, 'answers', editingAnswerId);
                 await updateDoc(answerRef, { content });
                 toast({ title: 'Success!', description: 'Your answer has been updated.' });
                 setEditingAnswerId(null);
             } else {
-                // Creating new answer
                 const batch = writeBatch(db);
                 const answerRef = doc(collection(db, 'questions', question.id, 'answers'));
 
-                // Fetch user profile data for authorName and authorAvatar
                 const userDocRef = doc(db, 'users', user.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 const userData = userDocSnap.exists() ? userDocSnap.data() : null;
 
-                const authorName = userData?.name || user.displayName || user.email;
-                const authorAvatar = userData?.image || user.photoURL || `https://placehold.co/40x40.png`;
+                const authorName = userData?.displayName || user.displayName || user.username;
+                const authorAvatar = userData?.photoURL || user.photoURL || `https://placehold.co/40x40.png`;
                 
                 batch.set(answerRef, {
                     content,
                     authorId: user.uid,
- authorName: authorName,
- authorAvatar: authorAvatar,
+                    authorName: authorName,
+                    authorAvatar: authorAvatar,
                     votes: 0,
                     createdAt: serverTimestamp(),
                     isAccepted: false,
@@ -212,13 +206,13 @@ export default function QuestionPage() {
 
                 await batch.commit();
 
-                // Send notification only if someone else answers the question
                 if (user.uid !== question.authorId) {
                     await addDoc(collection(db, 'notifications'), {
                         recipientId: question.authorId,
                         senderId: user.uid,
+                        senderName: authorName,
                         type: 'new_answer',
-                        answerId: answerRef.id, // Add answerId to notification
+                        answerId: answerRef.id,
                         questionId: question.id,
                         questionTitle: question.title,
                         read: false,
@@ -228,7 +222,6 @@ export default function QuestionPage() {
                  toast({ title: 'Success!', description: 'Your answer has been posted.' });
             }
             
-            // Refresh answers
             await fetchQuestionAndAnswers();
 
         } catch (error: any) {
@@ -267,7 +260,8 @@ export default function QuestionPage() {
 
     const handleEditAnswer = (answer: Answer) => {
         setEditingAnswerId(answer.id);
-        formRef.current?.scrollIntoView({ behavior: 'smooth' });
+        const formElement = document.getElementById('answer-form');
+        formElement?.scrollIntoView({ behavior: 'smooth' });
     }
 
     if (isLoading && !question) {
@@ -412,3 +406,5 @@ export default function QuestionPage() {
         </div>
     );
 }
+
+    
