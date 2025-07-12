@@ -64,11 +64,13 @@ const QuestionPageSkeleton = () => (
                     <CardContent>
                         <div className="flex gap-4">
                             <Skeleton className="h-20 w-12" />
-                            <div className="space-y-4 w-full">
-                                <Skeleton className="h-4 w-full" />
-                                <Skeleton className="h-4 w-full" />
-                                <Skeleton className="h-4 w-5/6" />
-                                <Skeleton className="h-40 w-full mt-2" />
+                            <div className="min-w-0 flex-1">
+                               <div className="space-y-4 w-full">
+                                  <Skeleton className="h-4 w-full" />
+                                  <Skeleton className="h-4 w-full" />
+                                  <Skeleton className="h-4 w-5/6" />
+                                  <Skeleton className="h-40 w-full mt-2" />
+                               </div>
                             </div>
                         </div>
                          <div className="flex flex-wrap gap-2 mt-6">
@@ -103,23 +105,11 @@ export default function QuestionPage() {
     const router = useRouter();
     const id = params.id as string;
 
-    const fetchQuestionAndAnswers = useCallback(async (isInitialLoad = false) => {
+    const fetchQuestionAndAnswers = useCallback(async () => {
         if (!db || !id) return;
         
-        const questionRef = doc(db, 'questions', id);
-
-        if (isInitialLoad) {
-            setIsLoading(true);
-            try {
-                // We use a separate update call here that doesn't depend on the rest of the function
-                await updateDoc(questionRef, { views: increment(1) });
-            } catch (e) {
-                // Non-critical, so we can ignore if it fails (e.g., permissions)
-                console.warn("Could not increment view count", e);
-            }
-        }
-        
         try {
+            const questionRef = doc(db, 'questions', id);
             const questionSnap = await getDoc(questionRef);
 
             if (questionSnap.exists()) {
@@ -142,18 +132,21 @@ export default function QuestionPage() {
             console.error("Error fetching data:", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to load question details.' });
         } finally {
-            if (isInitialLoad) {
-                setIsLoading(false);
-            }
+            setIsLoading(false);
         }
-    }, [id, toast, user?.uid]);
+    // We are disabling the exhaustive-deps rule here because we *only* want this to run when id changes.
+    // Re-running on user change would cause an infinite loop of re-renders.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id, toast]);
 
     useEffect(() => {
         if (id) {
-            fetchQuestionAndAnswers(true);
+            setIsLoading(true);
+            const questionRef = doc(db, 'questions', id);
+            updateDoc(questionRef, { views: increment(1) }).catch(e => console.warn("Could not increment view count", e));
+            fetchQuestionAndAnswers();
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [id]);
+    }, [id, fetchQuestionAndAnswers]);
 
     const handleAnswerSubmit = async (content: string) => {
         if (!user || !question) {
@@ -204,7 +197,7 @@ export default function QuestionPage() {
             }
             
             // Refresh answers
-            await fetchQuestionAndAnswers(false);
+            await fetchQuestionAndAnswers();
 
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Error', description: `Failed to submit answer: ${error.message}` });
@@ -252,8 +245,8 @@ export default function QuestionPage() {
                                 <div className="min-w-0 flex-1">
                                     <div className="prose dark:prose-invert max-w-none prose-p:text-foreground/90 w-full" dangerouslySetInnerHTML={{ __html: question.description }} />
                                     {question.code && (
-                                        <pre className="bg-muted p-4 rounded-md overflow-x-auto mt-4">
-                                            <code className="font-code">{question.code}</code>
+                                        <pre className="bg-muted p-4 rounded-md overflow-x-auto mt-4 font-code">
+                                            <code>{question.code}</code>
                                         </pre>
                                     )}
                                 </div>
@@ -307,3 +300,4 @@ export default function QuestionPage() {
         </div>
     );
 }
+

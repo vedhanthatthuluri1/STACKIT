@@ -1,0 +1,51 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    function isLoggedIn() {
+      return request.auth != null;
+    }
+
+    // Users collection
+    match /users/{userId} {
+      allow read;
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+    }
+    
+    // Votes sub-collection
+    match /users/{userId}/votes/{voteId} {
+        allow read, write: if isOwner(userId);
+    }
+
+    // Questions collection
+    match /questions/{questionId} {
+      allow read;
+      allow create: if isLoggedIn();
+      allow update: if isLoggedIn() && (
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes', 'views', 'answersCount']))
+      );
+    }
+
+    // Answers sub-collection
+    match /questions/{questionId}/answers/{answerId} {
+      allow read;
+      allow create: if isLoggedIn();
+      allow update: if isLoggedIn() && request.auth.uid == resource.data.authorId; // Allow update only by author
+      allow delete: if isLoggedIn() && request.auth.uid == resource.data.authorId;
+    }
+
+    // Notifications collection
+    match /notifications/{notificationId} {
+      allow read: if request.auth.uid == resource.data.recipientId;
+      allow create: if isLoggedIn();
+    }
+  }
+}

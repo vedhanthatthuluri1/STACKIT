@@ -19,7 +19,7 @@ import { signOut } from 'firebase/auth';
 import { useRouter } from 'next/navigation';
 import { ThemeToggle } from './theme-toggle';
 import { useEffect, useState } from 'react';
-import { collection, query, where, onSnapshot, orderBy, limit, writeBatch } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, orderBy, limit, writeBatch, doc } from 'firebase/firestore';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { cn } from '@/lib/utils';
 import {
@@ -63,6 +63,8 @@ export function Header() {
         setNotifications(notifs);
         const unread = notifs.filter(n => !n.read).length;
         setUnreadCount(unread);
+      }, (error) => {
+        console.error("Error fetching notifications:", error);
       });
 
       return () => unsubscribe();
@@ -106,8 +108,8 @@ export function Header() {
         </Link>
         <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-muted-foreground">
           <Link href="/" className="transition-colors hover:text-foreground">Questions</Link>
-          <Link href="#" className="transition-colors hover:text-foreground">Tags</Link>
-          <Link href="#" className="transition-colors hover:text-foreground">Users</Link>
+          <Link href="/tags" className="transition-colors hover:text-foreground">Tags</Link>
+          <Link href="/users" className="transition-colors hover:text-foreground">Users</Link>
           {user?.role === 'admin' && (
             <Link href="#" className="transition-colors hover:text-foreground">Admin</Link>
           )}
@@ -182,9 +184,11 @@ export function Header() {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <UserIcon className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
+                  <DropdownMenuItem asChild>
+                    <Link href={`/profile/${user.uid}`}>
+                      <UserIcon className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem>
                     <Bookmark className="mr-2 h-4 w-4" />
