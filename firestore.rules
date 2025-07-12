@@ -25,7 +25,8 @@ service cloud.firestore {
     match /questions/{questionId} {
       allow get, list: if true;
       allow create: if request.auth != null && isOwner(request.resource.data.authorId);
-      allow update, delete: if request.auth != null && isOwner(resource.data.authorId);
+      allow update: if request.auth != null && isOwner(resource.data.authorId);
+      allow delete: if request.auth != null && isOwner(resource.data.authorId);
 
       // Answers Subcollection
       // - Anyone can read answers.
