@@ -1,10 +1,11 @@
+
 "use client";
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, getDocs, collection, query, where } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { auth, db } from '@/lib/firebase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,13 +22,6 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
-
-  const isUsernameUnique = async (username: string) => {
-    if (!db) return false;
-    const q = query(collection(db, "users"), where("username", "==", username));
-    const querySnapshot = await getDocs(q);
-    return querySnapshot.empty;
-  };
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,12 +43,6 @@ export default function RegisterPage() {
         return;
     }
 
-    if (!await isUsernameUnique(username)) {
-        toast({ variant: 'destructive', title: 'Registration Failed', description: 'Username is already taken.' });
-        setIsLoading(false);
-        return;
-    }
-
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
@@ -69,6 +57,7 @@ export default function RegisterPage() {
         role: 'user',
         createdAt: serverTimestamp(),
         reputation: 0,
+        photoURL: '',
       });
 
       router.push('/');
