@@ -1,41 +1,59 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // Users:
+    // - Authenticated users can read any user's public profile data (username, displayName).
+    // - A user can only write to their own document.
+    // - Creation of a user document requires the uid to match the authenticated user.
     match /users/{userId} {
-      allow read, write: if request.auth.uid == userId;
-      match /votes/{voteId} {
-        allow read, write: if request.auth.uid == userId;
-      }
+      allow read: if request.auth != null;
+      allow write: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId;
     }
 
+    // Questions:
+    // - Authenticated users can read all questions.
+    // - Authenticated users can create questions.
+    // - Users can only update their own questions.
+    // - A user can update the answersCount and views on any question.
     match /questions/{questionId} {
-      allow read;
-      allow create: if request.auth.uid != null;
-      allow update: if request.auth.uid != null && (
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['views'])) ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['votes'])) ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['answersCount']))
-      );
-      
-      match /answers/{answerId} {
-        allow read;
-        allow create: if request.auth.uid != null;
-        allow update: if request.auth.uid == resource.data.authorId;
-        allow delete: if request.auth.uid == resource.data.authorId;
-      }
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && (
+                      resource.data.authorId == request.auth.uid ||
+                      request.resource.data.keys().hasOnly(['answersCount', 'views', 'votes'])
+                    );
     }
-    
+
+    // Answers:
+    // - Authenticated users can read answers.
+    // - Logged-in users can create answers.
+    // - Users can only update/delete their own answers.
+    match /questions/{questionId}/answers/{answerId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null;
+      allow update, delete: if request.auth != null && resource.data.authorId == request.auth.uid;
+    }
+
+    // Votes:
+    // - A user can only write to their own vote sub-collection.
+    match /users/{userId}/votes/{voteId} {
+        allow write, delete: if request.auth.uid == userId;
+        allow read: if request.auth.uid == userId;
+    }
+
+    // Notifications:
+    // - A user can only query for notifications where they are the recipient.
+    // - A user can read/get their own individual notification.
+    // - Notifications can be created by any authenticated user (e.g., when they post an answer).
+    // - A user can update their own notification (to mark it as read).
     match /notifications/{notificationId} {
-      // Allow users to query for their own notifications.
-      // This rule ensures that any 'list' (query) operation MUST include a `where('recipientId', '==', request.auth.uid)` clause.
-      allow list: if request.auth != null && request.query.where.recipientId == request.auth.uid;
-      
-      // Allow users to get their own individual notifications.
-      allow get: if request.auth != null && get(/databases/$(database)/documents/notifications/$(notificationId)).data.recipientId == request.auth.uid;
-      
-      // Allow creating notifications and updating the 'read' status.
-      allow create: if request.auth.uid != null;
-      allow update: if request.auth.uid == resource.data.recipientId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow get: if request.auth.uid == resource.data.recipientId;
+      allow list: if request.auth.uid == request.query.get('where.recipientId');
+      allow create: if request.auth != null;
+      allow update: if request.auth.uid == resource.data.recipientId;
     }
   }
 }
