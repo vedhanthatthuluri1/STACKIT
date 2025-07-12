@@ -2,48 +2,37 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper functions
+    
     function isOwner(userId) {
       return request.auth.uid == userId;
     }
 
-    // Users
     match /users/{userId} {
+      allow get, list: if request.auth.uid != null;
       allow create: if request.auth.uid == userId;
-      // Allow any authenticated user to view profiles
-      allow read: if request.auth.uid != null;
-      // Only owners can update or delete their profile
-      allow update, delete: if isOwner(userId);
-      allow list: if request.auth.uid != null;
+      allow update: if isOwner(userId);
     }
 
-    // Questions
     match /questions/{questionId} {
       allow read, list: if true;
       allow create: if request.auth.uid != null;
-      allow update: if isOwner(request.resource.data.authorId);
-      allow delete: if isOwner(resource.data.authorId);
-
-      // Answers
-      match /answers/{answerId} {
+      allow update: if isOwner(resource.data.authorId);
+    }
+    
+    match /questions/{questionId}/answers/{answerId} {
         allow read: if true;
         allow create: if request.auth.uid != null;
-        allow update: if isOwner(request.resource.data.authorId);
-        allow delete: if 
-          isOwner(resource.data.authorId) ||
-          isOwner(get(/databases/$(database)/documents/questions/$(questionId)).data.authorId);
-      }
+        allow update: if isOwner(resource.data.authorId);
+        allow delete: if isOwner(resource.data.authorId) || isOwner(get(/databases/$(database)/documents/questions/$(questionId)).data.authorId);
     }
-
-    // Votes
+    
     match /users/{userId}/votes/{voteId} {
         allow read, write: if isOwner(userId);
     }
 
-    // Notifications
     match /notifications/{notificationId} {
-      allow read, write: if isOwner(request.resource.data.recipientId);
+        allow read, write: if isOwner(resource.data.recipientId);
+        allow list: if request.query.where.recipientId == request.auth.uid;
     }
   }
 }
