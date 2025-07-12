@@ -4,14 +4,13 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
 import { doc, getDoc, collection, getDocs, orderBy, query, writeBatch, increment, serverTimestamp, addDoc } from 'firebase/firestore';
-import { db, auth } from '@/lib/firebase';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { format, formatDistanceToNowStrict } from 'date-fns';
-import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { AnswerCard } from '@/components/answer-card';
 import { AnswerForm } from '@/components/answer-form';
@@ -37,7 +36,6 @@ interface Question extends DocumentData {
 export interface Answer extends DocumentData {
   id: string;
   content: string;
-  code?: string;
   authorId: string;
   authorName: string;
   authorAvatar: string;
@@ -140,7 +138,7 @@ export default function QuestionPage() {
         fetchQuestionAndAnswers();
     }, [fetchQuestionAndAnswers]);
 
-    const handleAnswerSubmit = async (content: string, code: string) => {
+    const handleAnswerSubmit = async (content: string) => {
         if (!user || !question) {
             toast({ variant: 'destructive', title: 'Authentication Required', description: 'You must be logged in to post an answer.' });
             return;
@@ -152,7 +150,6 @@ export default function QuestionPage() {
             
             batch.set(answerRef, {
                 content,
-                code,
                 authorId: user.uid,
                 authorName: user.displayName || user.username,
                 authorAvatar: user.photoURL || `https://placehold.co/40x40.png`,
@@ -264,5 +261,3 @@ export default function QuestionPage() {
         </div>
     );
 }
-
-    

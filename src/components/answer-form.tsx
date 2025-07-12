@@ -8,21 +8,20 @@ import * as z from 'zod';
 import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { Loader2, Send } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import { RichTextEditor } from './rich-text-editor';
 
 const answerFormSchema = z.object({
   content: z.string().min(20, 'Your answer must be at least 20 characters long.'),
-  code: z.string().optional(),
 });
 
 type AnswerFormValues = z.infer<typeof answerFormSchema>;
 
 interface AnswerFormProps {
-    onSubmit: (content: string, code: string) => Promise<void>;
+    onSubmit: (content: string) => Promise<void>;
 }
 
 export function AnswerForm({ onSubmit }: AnswerFormProps) {
@@ -32,13 +31,13 @@ export function AnswerForm({ onSubmit }: AnswerFormProps) {
 
     const form = useForm<AnswerFormValues>({
         resolver: zodResolver(answerFormSchema),
-        defaultValues: { content: '', code: '' },
+        defaultValues: { content: '' },
     });
 
     const handleFormSubmit = async (data: AnswerFormValues) => {
         setIsLoading(true);
         try {
-            await onSubmit(data.content, data.code || '');
+            await onSubmit(data.content);
             form.reset();
         } catch (error) {
              toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit your answer.' });
@@ -72,19 +71,11 @@ export function AnswerForm({ onSubmit }: AnswerFormProps) {
                             render={({ field }) => (
                                 <FormItem>
                                     <FormControl>
-                                        <Textarea placeholder="Write your detailed answer here..." rows={8} {...field} />
-                                    </FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )}
-                        />
-                        <FormField
-                            control={form.control}
-                            name="code"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <FormControl>
-                                        <Textarea placeholder="Add a code snippet (optional)..." rows={6} className="font-code" {...field} />
+                                        <RichTextEditor 
+                                            value={field.value} 
+                                            onChange={field.onChange}
+                                            placeholder="Write your detailed answer here..."
+                                        />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
@@ -109,5 +100,3 @@ export function AnswerForm({ onSubmit }: AnswerFormProps) {
         </Card>
     );
 }
-
-    

@@ -1,11 +1,11 @@
 
 "use client";
 
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { CheckCircle2, User } from 'lucide-react';
+import { CheckCircle2 } from 'lucide-react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { VoteButtons } from './vote-buttons';
 import type { Answer } from '@/app/question/[id]/page';
@@ -20,7 +20,6 @@ export function AnswerCard({ questionId, answer }: AnswerCardProps) {
     const { user } = useAuth();
     const createdAtDate = answer.createdAt ? answer.createdAt.toDate() : new Date();
 
-    // Placeholder for accept answer functionality
     const handleAcceptAnswer = () => {
         console.log("Accepting answer", answer.id);
     }
@@ -30,14 +29,10 @@ export function AnswerCard({ questionId, answer }: AnswerCardProps) {
             <div className="flex gap-6 p-6 items-start">
                 <VoteButtons type="answer" id={answer.id} questionId={questionId} initialVotes={answer.votes} />
                 <div className="w-full">
-                    <div className="prose dark:prose-invert max-w-none prose-p:text-foreground/90 prose-pre:bg-muted prose-pre:p-4 prose-pre:rounded-md prose-pre:overflow-x-auto">
-                        <p>{answer.content}</p>
-                        {answer.code && (
-                             <pre>
-                                <code className="font-code">{answer.code}</code>
-                            </pre>
-                        )}
-                    </div>
+                    <div 
+                        className="prose dark:prose-invert max-w-none prose-p:text-foreground/90 prose-pre:bg-muted prose-pre:p-4 prose-pre:rounded-md prose-pre:overflow-x-auto"
+                        dangerouslySetInnerHTML={{ __html: answer.content }}
+                    />
 
                     <Separator className="my-4" />
 
@@ -74,5 +69,3 @@ export function AnswerCard({ questionId, answer }: AnswerCardProps) {
         </Card>
     );
 }
-
-    
