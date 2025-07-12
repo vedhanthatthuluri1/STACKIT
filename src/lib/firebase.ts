@@ -14,12 +14,12 @@ const firebaseConfig: FirebaseOptions = {
 
 // A function to initialize Firebase, but only if the config is valid
 function initializeFirebase() {
-  const apps = getApps();
-  if (apps.length) {
-    return getApp();
-  }
   // Check if all required keys are present before initializing
   if (firebaseConfig.apiKey && firebaseConfig.projectId) {
+    const apps = getApps();
+    if (apps.length) {
+      return getApp();
+    }
     return initializeApp(firebaseConfig);
   }
   return null; // Return null if config is invalid
