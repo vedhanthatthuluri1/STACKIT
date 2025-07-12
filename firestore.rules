@@ -3,64 +3,42 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if the requester is the owner of a document.
     function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
+      return request.auth.uid == userId;
     }
 
-    // USER PROFILES
-    // - Allow user creation on signup.
-    // - Allow authenticated users to read/list profiles.
-    // - Only owners can update their profile.
+    function isQuestionAuthor(questionId) {
+      return request.auth.uid == get(/databases/$(database)/documents/questions/$(questionId)).data.authorId;
+    }
+
     match /users/{userId} {
       allow create: if request.auth.uid == userId;
       allow get, list: if request.auth != null;
-      allow update: if isOwner(userId);
+      allow update: if request.auth != null && isOwner(userId);
     }
-    
-    // QUESTIONS
-    // - Public read access for all questions.
-    // - Authenticated users can create questions.
-    // - Only the author can update or delete their question.
-    match /questions/{questionId} {
-      allow get, list: if true;
-      allow create: if isOwner(request.resource.data.authorId);
-      allow update: if isOwner(resource.data.authorId);
-      // To delete a question, you must be the author.
-      // This rule is simple, but the answer deletion rule below is what makes the cascade work.
-      allow delete: if isOwner(resource.data.authorId);
 
-      // ANSWERS
-      // - Public read access for all answers.
-      // - Authenticated users can create answers.
-      // - Owners can update their answer. Question author can mark as accepted.
-      // - Owners can delete their answer. Question author can also delete when deleting the question.
+    match /questions/{questionId} {
+      allow read: if true;
+      allow create: if request.auth != null && isOwner(request.resource.data.authorId);
+      allow update: if request.auth != null && isOwner(resource.data.authorId);
+      allow delete: if request.auth != null && isOwner(resource.data.authorId);
+
       match /answers/{answerId} {
-        allow get, list: if true;
-        allow create: if isOwner(request.resource.data.authorId);
-        
-        // Allow update by answer author (for content) OR question author (for isAccepted).
-        allow update: if isOwner(resource.data.authorId) || isOwner(get(/databases/$(database)/documents/questions/$(questionId)).data.authorId);
-        
-        // Allow deletion by answer author OR if the parent question is being deleted.
-        allow delete: if isOwner(resource.data.authorId) || !exists(/databases/$(database)/documents/questions/$(questionId));
+        allow read: if true;
+        allow create: if request.auth != null && isOwner(request.resource.data.authorId);
+        allow update: if request.auth != null && (isOwner(resource.data.authorId) || isQuestionAuthor(questionId));
+        allow delete: if request.auth != null && (isOwner(resource.data.authorId) || isQuestionAuthor(questionId));
       }
     }
 
-    // USER VOTES
-    // - Users can only manage their own vote documents.
     match /users/{userId}/votes/{voteId} {
-      allow read, write: if isOwner(userId);
+        allow read, write, delete: if isOwner(userId);
     }
-    
-    // NOTIFICATIONS
-    // - Users can only read their own notifications.
-    // - Allow creation by authenticated users (e.g., when posting an answer).
-    // - Allow deletion if the parent question is being deleted.
+
     match /notifications/{notificationId} {
-      allow read, update: if isOwner(resource.data.recipientId);
-      allow create: if request.auth != null;
-      allow delete: if !exists(/databases/$(database)/documents/questions/$(resource.data.questionId));
+        allow read, update: if request.auth.uid == resource.data.recipientId;
+        allow create: if request.auth != null;
+        allow delete: if request.auth.uid == resource.data.recipientId || isQuestionAuthor(resource.data.questionId);
     }
   }
 }
