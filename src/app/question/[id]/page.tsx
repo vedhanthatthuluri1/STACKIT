@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { doc, getDoc, collection, getDocs, orderBy, query, writeBatch, increment, serverTimestamp, addDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, orderBy, query, writeBatch, increment, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -100,14 +100,16 @@ export default function QuestionPage() {
     const params = useParams();
     const id = params.id as string;
 
-    const fetchQuestionAndAnswers = useCallback(async () => {
+    const fetchQuestionAndAnswers = useCallback(async (isInitialLoad = false) => {
         if (!db || !id) return;
-        setIsLoading(true);
+        if (isInitialLoad) {
+            setIsLoading(true);
+        }
+        
         try {
             const questionRef = doc(db, 'questions', id);
             
-            // Only increment view if it's not the initial load for a user
-            if (!question) {
+            if (isInitialLoad) {
                 const batch = writeBatch(db);
                 batch.update(questionRef, { views: increment(1) });
                 await batch.commit();
@@ -129,22 +131,24 @@ export default function QuestionPage() {
                 setAnswers(answersData);
 
             } else {
-                console.log('No such document!');
                  toast({ variant: 'destructive', title: 'Error', description: 'Question not found.' });
             }
         } catch (error) {
             console.error("Error fetching data:", error);
             toast({ variant: 'destructive', title: 'Error', description: 'Failed to load question details.' });
         } finally {
-            setIsLoading(false);
+            if (isInitialLoad) {
+                setIsLoading(false);
+            }
         }
-    }, [id, toast, user?.uid, question]);
+    }, [id, toast, user?.uid]);
 
     useEffect(() => {
         if (id) {
-            fetchQuestionAndAnswers();
+            fetchQuestionAndAnswers(true);
         }
-    }, [id, fetchQuestionAndAnswers]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [id]);
 
     const handleAnswerSubmit = async (content: string) => {
         if (!user || !question) {
@@ -181,7 +185,7 @@ export default function QuestionPage() {
             }
             
             // Refresh answers
-            fetchQuestionAndAnswers();
+            await fetchQuestionAndAnswers(false);
 
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Error', description: `Failed to submit answer: ${error.message}` });
@@ -223,14 +227,12 @@ export default function QuestionPage() {
                              <div className="flex gap-6">
                                 <VoteButtons type="question" id={question.id} initialVotes={question.votes} />
                                 <div className="min-w-0 flex-1">
-                                    <div className="prose dark:prose-invert max-w-none prose-p:text-foreground/90 w-full">
-                                        <p>{question.description}</p>
-                                        {question.code && (
-                                            <pre className="bg-muted p-4 rounded-md overflow-x-auto">
-                                                <code className="font-code">{question.code}</code>
-                                            </pre>
-                                        )}
-                                    </div>
+                                    <div className="prose dark:prose-invert max-w-none prose-p:text-foreground/90 w-full" dangerouslySetInnerHTML={{ __html: question.description }} />
+                                    {question.code && (
+                                        <pre className="bg-muted p-4 rounded-md overflow-x-auto mt-4">
+                                            <code className="font-code">{question.code}</code>
+                                        </pre>
+                                    )}
                                 </div>
                             </div>
 
