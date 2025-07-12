@@ -3,62 +3,64 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper Functions
+    // Helper function to check if the requester is the owner of a document.
     function isOwner(userId) {
-      return request.auth.uid == userId;
+      return request.auth != null && request.auth.uid == userId;
     }
 
-    // Users Collection
-    // - Anyone can create their own user document on sign up.
-    // - Anyone authenticated can view profiles.
-    // - Users can only update their own profile.
+    // USER PROFILES
+    // - Allow user creation on signup.
+    // - Allow authenticated users to read/list profiles.
+    // - Only owners can update their profile.
     match /users/{userId} {
       allow create: if request.auth.uid == userId;
       allow get, list: if request.auth != null;
-      allow update: if request.auth != null && isOwner(userId);
+      allow update: if isOwner(userId);
     }
-
-    // Questions Collection
-    // - Anyone can read questions.
+    
+    // QUESTIONS
+    // - Public read access for all questions.
     // - Authenticated users can create questions.
     // - Only the author can update or delete their question.
     match /questions/{questionId} {
       allow get, list: if true;
-      allow create: if request.auth != null && isOwner(request.resource.data.authorId);
-      allow update, delete: if request.auth != null && isOwner(resource.data.authorId);
+      allow create: if isOwner(request.resource.data.authorId);
+      allow update: if isOwner(resource.data.authorId);
+      // To delete a question, you must be the author.
+      // This rule is simple, but the answer deletion rule below is what makes the cascade work.
+      allow delete: if isOwner(resource.data.authorId);
 
-      // Answers Subcollection
-      // - Anyone can read/list answers.
+      // ANSWERS
+      // - Public read access for all answers.
       // - Authenticated users can create answers.
-      // - Question author can accept an answer.
-      // - Answer author can update/delete their answer.
+      // - Owners can update their answer. Question author can mark as accepted.
+      // - Owners can delete their answer. Question author can also delete when deleting the question.
       match /answers/{answerId} {
         allow get, list: if true;
-        allow create: if request.auth != null && isOwner(request.resource.data.authorId);
-        allow update: if request.auth != null && 
-                      (isOwner(resource.data.authorId) || isOwner(get(/databases/$(database)/documents/questions/$(questionId)).data.authorId));
-        allow delete: if request.auth != null && 
-                      (isOwner(resource.data.authorId) || isOwner(get(/databases/$(database)/documents/questions/$(questionId)).data.authorId));
+        allow create: if isOwner(request.resource.data.authorId);
+        
+        // Allow update by answer author (for content) OR question author (for isAccepted).
+        allow update: if isOwner(resource.data.authorId) || isOwner(get(/databases/$(database)/documents/questions/$(questionId)).data.authorId);
+        
+        // Allow deletion by answer author OR if the parent question is being deleted.
+        allow delete: if isOwner(resource.data.authorId) || !exists(/databases/$(database)/documents/questions/$(questionId));
       }
     }
-    
-    // Answers Collection Group (for profile page queries)
-    match /{path=**}/answers/{answerId} {
-      allow list: if request.auth != null;
-    }
 
-    // Votes Subcollection (under users)
-    // - A user can only manage their own votes.
+    // USER VOTES
+    // - Users can only manage their own vote documents.
     match /users/{userId}/votes/{voteId} {
-        allow read, write, delete: if isOwner(userId);
+      allow read, write: if isOwner(userId);
     }
     
-    // Notifications Collection
-    // - Only the recipient can read their notifications.
-    // - Authenticated users can create notifications (by answering questions).
+    // NOTIFICATIONS
+    // - Users can only read their own notifications.
+    // - Allow creation by authenticated users (e.g., when posting an answer).
+    // - Allow deletion if the parent question is being deleted.
     match /notifications/{notificationId} {
-        allow read, update: if request.auth.uid == resource.data.recipientId;
-        allow create: if request.auth != null;
+      allow read, update: if isOwner(resource.data.recipientId);
+      allow create: if request.auth != null;
+      allow delete: if !exists(/databases/$(database)/documents/questions/$(resource.data.questionId));
     }
   }
 }
