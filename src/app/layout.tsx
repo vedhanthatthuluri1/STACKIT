@@ -4,6 +4,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Header } from '@/components/header';
 import { AuthProvider } from '@/hooks/use-auth';
 import { ThemeProvider } from '@/components/theme-provider';
+import { Footer } from '@/components/footer';
 
 export const metadata: Metadata = {
   title: 'StackIt – A Minimal Q&A Forum',
@@ -33,6 +34,7 @@ export default function RootLayout({
             <div className="relative flex min-h-screen flex-col">
               <Header />
               <main className="flex-1">{children}</main>
+              <Footer />
             </div>
             <Toaster />
           </AuthProvider>
