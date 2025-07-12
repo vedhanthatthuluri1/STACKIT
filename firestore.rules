@@ -1,53 +1,55 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    
+    function isUserAuthenticated() {
+      return request.auth != null;
+    }
 
-    // Users: Publicly readable for profiles, but only the user can write to their own doc.
-    match /users/{userId} {
-      allow read;
-      allow write: if request.auth != null && request.auth.uid == userId;
+    function isOwner(resourceId) {
+      return request.auth.uid == resourceId;
     }
     
-    // User Votes: Only the user can access their own votes subcollection.
-    match /users/{userId}/votes/{voteId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+    function isResourceOwner(resource) {
+      return request.auth.uid == resource.data.authorId;
     }
 
-    // Questions: Allow reads for everyone.
-    // Writes (create, update, delete) are restricted.
+    match /users/{userId} {
+      allow read;
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+    }
+
     match /questions/{questionId} {
       allow read;
-      // Allow create if user is logged in
-      allow create: if request.auth != null;
-      // Allow updates for specific fields like votes and answersCount if logged in
-      allow update: if request.auth != null && 
-                      (
-                        (request.resource.data.diff(resource.data).affectedKeys()
-                          .hasOnly(['votes', 'views'])) ||
-                        (request.resource.data.answersCount == resource.data.answersCount + 1)
-                      );
-      allow delete: if request.auth != null && request.auth.uid == resource.data.authorId;
+      allow create: if isUserAuthenticated() && isResourceOwner(request.resource);
+      allow update: if isUserAuthenticated() && (
+        (isResourceOwner(resource) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'description', 'code', 'tags'])) ||
+        (request.resource.data.votes == resource.data.votes + 1 || request.resource.data.votes == resource.data.votes - 1) ||
+        (request.resource.data.answersCount == resource.data.answersCount + 1)
+      );
 
-      // Answers Subcollection
       match /answers/{answerId} {
         allow read;
-        // Allow user to create an answer
-        allow create: if request.auth != null;
-        // Allow author to update their answer
-        allow update: if request.auth != null && request.auth.uid == resource.data.authorId;
-        // Allow author to delete their answer
-        allow delete: if request.auth != null && request.auth.uid == resource.data.authorId;
+        allow create: if isUserAuthenticated() && isResourceOwner(request.resource);
+        allow update: if isUserAuthenticated() && (
+          (isResourceOwner(resource) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content'])) ||
+          (request.resource.data.votes == resource.data.votes + 1 || request.resource.data.votes == resource.data.votes - 1)
+        );
       }
     }
     
-    // Notifications: Users can only read their own notifications.
-    // Creation is handled by backend logic (triggered by answering a question).
+    match /users/{userId}/votes/{voteId} {
+        allow read, write: if isUserAuthenticated() && isOwner(userId);
+    }
+
     match /notifications/{notificationId} {
-      allow read, update: if request.auth != null && request.auth.uid == resource.data.recipientId;
-      allow create: if request.auth != null; // Server-side creation is authenticated
-      allow delete: if request.auth != null && request.auth.uid == resource.data.recipientId;
+      // Users can only read notifications intended for them.
+      allow read: if isUserAuthenticated() && request.auth.uid == resource.data.recipientId;
+      allow create: if isUserAuthenticated();
+      // Users can only mark their own notifications as read.
+      allow update: if isUserAuthenticated() && request.auth.uid == resource.data.recipientId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
     }
   }
 }
