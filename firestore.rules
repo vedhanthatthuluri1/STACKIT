@@ -1,22 +1,17 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Allow reading user data to check for unique usernames during registration
+    // Users can read any profile, but can only create their own user document.
     match /users/{userId} {
-      allow read: if true;
+      allow read;
       allow create: if request.auth != null && request.auth.uid == userId;
-      allow update, delete: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Rules for questions
+    // Anyone can read questions.
+    // An authenticated user can create a question, but only if the authorId matches their own UID.
     match /questions/{questionId} {
-      allow read: if true;
-      // Only authenticated users can create questions
-      allow create: if request.auth != null;
-      // Only the author of the question can update or delete it
-      allow update, delete: if request.auth != null && request.auth.uid == resource.data.authorId;
+      allow read;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.authorId;
     }
   }
 }
