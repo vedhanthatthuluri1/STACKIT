@@ -1,17 +1,48 @@
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can read any profile, but can only create their own user document.
+
+    // Users Collection
     match /users/{userId} {
+      // Anyone can read a user's public profile
       allow read;
+      // A user can create their own document upon registration
       allow create: if request.auth != null && request.auth.uid == userId;
+      // A user can only update their own profile
+      allow update: if request.auth != null && request.auth.uid == userId;
     }
 
-    // Anyone can read questions.
-    // An authenticated user can create a question, but only if the authorId matches their own UID.
+    // Questions Collection
     match /questions/{questionId} {
+      // Anyone can read questions
       allow read;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.authorId;
+      // Authenticated users can create questions
+      allow create: if request.auth != null && request.resource.data.authorId == request.auth.uid;
+      // Users can update votes and views, authors can update content
+      allow update: if request.auth != null;
+    }
+
+    // Answers Subcollection
+    match /questions/{questionId}/answers/{answerId} {
+        // Anyone can read answers
+        allow read;
+        // Authenticated users can create answers
+        allow create: if request.auth != null && request.resource.data.authorId == request.auth.uid;
+        // Users can update votes, authors can accept answers
+        allow update: if request.auth != null;
+    }
+
+    // Votes Subcollection on Users
+    // This tracks if a user has already voted on a specific question or answer
+    match /users/{userId}/votes/{contentId} {
+        // A user can read their own votes
+        allow read: if request.auth != null && request.auth.uid == userId;
+        // A user can create/update/delete their own vote
+        allow write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }
+
+    
