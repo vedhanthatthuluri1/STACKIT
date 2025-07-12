@@ -3,7 +3,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useParams } from 'next/navigation';
-import { doc, getDoc, collection, getDocs, orderBy, query, writeBatch, increment, serverTimestamp, addDoc } from 'firebase/firestore';
+import { doc, getDoc, collection, getDocs, orderBy, query, writeBatch, increment, serverTimestamp, addDoc, updateDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -93,6 +93,7 @@ const QuestionPageSkeleton = () => (
 export default function QuestionPage() {
     const [question, setQuestion] = useState<Question | null>(null);
     const [answers, setAnswers] = useState<Answer[]>([]);
+    const [userAnswer, setUserAnswer] = useState<Answer | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const { user } = useAuth();
     const { toast } = useToast();
@@ -103,23 +104,28 @@ export default function QuestionPage() {
         if (!db || !id) return;
         setIsLoading(true);
         try {
-            const batch = writeBatch(db);
             const questionRef = doc(db, 'questions', id);
-
-            // Increment view count
-            batch.update(questionRef, { views: increment(1) });
-            await batch.commit();
+            
+            // Only increment view if it's not the initial load for a user
+            if (!question) {
+                const batch = writeBatch(db);
+                batch.update(questionRef, { views: increment(1) });
+                await batch.commit();
+            }
 
             const questionSnap = await getDoc(questionRef);
 
             if (questionSnap.exists()) {
-                const questionData = { id: questionSnap.id, ...questionSnap.data(), views: questionSnap.data().views + 1 } as Question;
+                const questionData = { id: questionSnap.id, ...questionSnap.data() } as Question;
                 setQuestion(questionData);
 
                 // Fetch answers
                 const answersQuery = query(collection(db, 'questions', id, 'answers'), orderBy('createdAt', 'desc'));
                 const answersSnap = await getDocs(answersQuery);
                 const answersData = answersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Answer));
+                
+                const currentUserAnswer = answersData.find(answer => answer.authorId === user?.uid) || null;
+                setUserAnswer(currentUserAnswer);
                 setAnswers(answersData);
 
             } else {
@@ -132,7 +138,7 @@ export default function QuestionPage() {
         } finally {
             setIsLoading(false);
         }
-    }, [id, toast]);
+    }, [id, toast, user?.uid, question]);
 
     useEffect(() => {
         if (id) {
@@ -147,35 +153,43 @@ export default function QuestionPage() {
         }
 
         try {
-            const batch = writeBatch(db);
-            const answerRef = doc(collection(db, 'questions', question.id, 'answers'));
+            if (userAnswer) {
+                // Editing existing answer
+                const answerRef = doc(db, 'questions', question.id, 'answers', userAnswer.id);
+                await updateDoc(answerRef, { content });
+                toast({ title: 'Success!', description: 'Your answer has been updated.' });
+            } else {
+                // Creating new answer
+                const batch = writeBatch(db);
+                const answerRef = doc(collection(db, 'questions', question.id, 'answers'));
+                
+                batch.set(answerRef, {
+                    content,
+                    authorId: user.uid,
+                    authorName: user.displayName || user.username,
+                    authorAvatar: user.photoURL || `https://placehold.co/40x40.png`,
+                    votes: 0,
+                    createdAt: serverTimestamp(),
+                    isAccepted: false,
+                });
+
+                const questionRef = doc(db, 'questions', question.id);
+                batch.update(questionRef, { answersCount: increment(1) });
+
+                await batch.commit();
+                 toast({ title: 'Success!', description: 'Your answer has been posted.' });
+            }
             
-            batch.set(answerRef, {
-                content,
-                authorId: user.uid,
-                authorName: user.displayName || user.username,
-                authorAvatar: user.photoURL || `https://placehold.co/40x40.png`,
-                votes: 0,
-                createdAt: serverTimestamp(),
-                isAccepted: false,
-            });
-
-            const questionRef = doc(db, 'questions', question.id);
-            batch.update(questionRef, { answersCount: increment(1) });
-
-            await batch.commit();
-
             // Refresh answers
             fetchQuestionAndAnswers();
-            
-            toast({ title: 'Success!', description: 'Your answer has been posted.' });
+
         } catch (error: any) {
-            toast({ variant: 'destructive', title: 'Error', description: `Failed to post answer: ${error.message}` });
+            toast({ variant: 'destructive', title: 'Error', description: `Failed to submit answer: ${error.message}` });
         }
     };
 
 
-    if (isLoading) {
+    if (isLoading && !question) {
         return <QuestionPageSkeleton />;
     }
 
@@ -237,7 +251,10 @@ export default function QuestionPage() {
                     </div>
                     
                     {/* Your Answer Section */}
-                    <AnswerForm onSubmit={handleAnswerSubmit} />
+                    <AnswerForm 
+                        onSubmit={handleAnswerSubmit}
+                        existingAnswer={userAnswer}
+                    />
 
                 </div>
                 {/* Right Sidebar */}

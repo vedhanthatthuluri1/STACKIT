@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -9,10 +9,11 @@ import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
-import { Loader2, Send } from 'lucide-react';
+import { Loader2, Send, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
 import { RichTextEditor } from './rich-text-editor';
+import type { Answer } from '@/app/question/[id]/page';
 
 const answerFormSchema = z.object({
   content: z.string().min(20, 'Your answer must be at least 20 characters long.'),
@@ -22,9 +23,10 @@ type AnswerFormValues = z.infer<typeof answerFormSchema>;
 
 interface AnswerFormProps {
     onSubmit: (content: string) => Promise<void>;
+    existingAnswer?: Answer | null;
 }
 
-export function AnswerForm({ onSubmit }: AnswerFormProps) {
+export function AnswerForm({ onSubmit, existingAnswer = null }: AnswerFormProps) {
     const [isLoading, setIsLoading] = useState(false);
     const { user } = useAuth();
     const { toast } = useToast();
@@ -34,11 +36,22 @@ export function AnswerForm({ onSubmit }: AnswerFormProps) {
         defaultValues: { content: '' },
     });
 
+    useEffect(() => {
+        if (existingAnswer) {
+            form.setValue('content', existingAnswer.content);
+        } else {
+            form.reset({ content: '' });
+        }
+    }, [existingAnswer, form]);
+
+
     const handleFormSubmit = async (data: AnswerFormValues) => {
         setIsLoading(true);
         try {
             await onSubmit(data.content);
-            form.reset();
+            if (!existingAnswer) {
+               form.reset();
+            }
         } catch (error) {
              toast({ variant: 'destructive', title: 'Error', description: 'Failed to submit your answer.' });
         } finally {
@@ -57,10 +70,14 @@ export function AnswerForm({ onSubmit }: AnswerFormProps) {
         )
     }
 
+    const isEditing = !!existingAnswer;
+
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="text-2xl font-bold font-headline">Your Answer</CardTitle>
+                <CardTitle className="text-2xl font-bold font-headline">
+                    {isEditing ? 'Edit Your Answer' : 'Your Answer'}
+                </CardTitle>
             </CardHeader>
             <CardContent>
                 <Form {...form}>
@@ -85,12 +102,12 @@ export function AnswerForm({ onSubmit }: AnswerFormProps) {
                              {isLoading ? (
                                 <>
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                    Posting...
+                                    {isEditing ? 'Saving...' : 'Posting...'}
                                 </>
                                 ) : (
                                 <>
-                                    <Send className="mr-2 h-4 w-4" />
-                                    Post Your Answer
+                                    {isEditing ? <Edit className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
+                                    {isEditing ? 'Save Changes' : 'Post Your Answer'}
                                 </>
                             )}
                         </Button>
