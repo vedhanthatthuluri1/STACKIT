@@ -31,10 +31,12 @@ const QuestionPageSkeleton = () => (
         <Card>
             <CardHeader>
                 <Skeleton className="h-8 w-3/4 mb-2" />
-                <Skeleton className="h-4 w-1/2" />
-                 <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
                     <Skeleton className="h-10 w-10 rounded-full" />
-                    <Skeleton className="h-4 w-48" />
+                    <div className="space-y-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-48" />
+                    </div>
                 </div>
             </CardHeader>
             <CardContent>
@@ -42,7 +44,7 @@ const QuestionPageSkeleton = () => (
                 <Skeleton className="h-4 w-full mt-2" />
                 <Skeleton className="h-4 w-5/6 mt-2" />
 
-                <Skeleton className="h-32 w-full mt-6" />
+                <Skeleton className="h-40 w-full mt-6" />
 
                 <div className="flex flex-wrap gap-2 mt-6">
                     <Skeleton className="h-6 w-20" />
@@ -78,7 +80,9 @@ export default function QuestionPage({ params }: { params: { id: string } }) {
             }
         };
 
-        fetchQuestion();
+        if (params.id) {
+            fetchQuestion();
+        }
     }, [params.id]);
 
     if (isLoading) {
@@ -98,7 +102,7 @@ export default function QuestionPage({ params }: { params: { id: string } }) {
                     <CardTitle className="text-3xl font-bold font-headline">{question.title}</CardTitle>
                      <div className="flex items-center gap-4 mt-4 text-sm text-muted-foreground">
                         <Avatar className="h-10 w-10">
-                            <AvatarImage src={question.authorAvatar} />
+                            <AvatarImage src={question.authorAvatar} data-ai-hint="avatar" />
                             <AvatarFallback>{question.authorName?.charAt(0)}</AvatarFallback>
                         </Avatar>
                         <div>
@@ -108,10 +112,10 @@ export default function QuestionPage({ params }: { params: { id: string } }) {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="prose dark:prose-invert max-w-none">
+                    <div className="prose dark:prose-invert max-w-none prose-p:text-foreground/90 prose-pre:bg-muted prose-pre:p-4 prose-pre:rounded-md prose-pre:overflow-x-auto">
                         <p>{question.description}</p>
                         {question.code && (
-                            <pre className="bg-muted p-4 rounded-md overflow-x-auto">
+                            <pre>
                                 <code className="font-code">{question.code}</code>
                             </pre>
                         )}
