@@ -8,7 +8,7 @@ StackIt is a full-featured Q&A platform built with a modern, futuristic aestheti
 @VedhanthA      Team Leader |
 @Yogyatha-09      Developer |
 @manoj-2305         Backend |
-@sharanreddy12      Backend |
+@sharanreddy12      Frontend |
 
 ---
 
